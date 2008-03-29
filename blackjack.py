@@ -18,8 +18,14 @@ class Hand:
 	def __init__(self):
 		self.bet = 0
 		self.cards = []
+	def card_value(self,card):
+		if ( sum(self.cards) + card )  > 21 and card == 11:
+			return 1
+		else: return card 
+	def value(self):
+		return sum(self.cards)
 	def deal_card(self,card):
-		self.cards.append(card)
+		self.cards.append(self.card_value(card))
 	def place_bet(self,bet):
 		self.bet = bet
 	def clear_cards(self):
@@ -43,9 +49,12 @@ class Player:
 	def bet_hand(self,hand):
 		self.bankroll -= 10
 		hand.place_bet(10)
+		print self.name + " bets " + str(10)
 
-	def ask(self,upcard):
-		return HIT
+	def action(self,hand,upcard):
+		if hand.value() < 17:
+			return HIT
+		else: return STAY
 	def lose_all_hands(self):
 		for h in self.hands:
 			self.lose_hand(h)
@@ -53,21 +62,34 @@ class Player:
 		for h in self.hands:
 			self.win_hand(h)
 	def lose_hand(self,hand):
+		if not hand.value():
+			return
+		print self.name + " loses hand"
 		self.losses -= 1
 		hand.clear_cards()
 	def win_hand(self,hand):
+		if not hand.value():
+			return
+		print self.name + " wins hand"
 		self.wins += 1
+		self.bankroll += hand.bet * 2
+		hand.clear_cards()
+	def push_hand(self,hand):
+		print self.name + " pushes"
 		self.bankroll += hand.bet
-		hand.clear_cards()
 	def blackjack_hand(self,hand):
-		print "Blackjack!!"
-		self.blackjack += 1
-		self.bankroll += hand.bet * (3./2.)
+		print self.name + " Blackjack!!"
+		self.blackjacks += 1
+		self.bankroll += hand.bet + hand.bet * (3./2.)
 		hand.clear_cards()
+	def deal_card(self,hand,card):
+		print "Dealing " + self.name + " card " + str(card)
+		hand.deal_card(card)
 
 class Rules:
 	def __init__(self):
 		pass
+			
 	def blackjack(self,hand):
 		return sum(hand.cards) == 21
 	def bust(self,hand):
@@ -85,10 +107,40 @@ class Blackjack:
 		self.take_bets()
 		self.deal_cards()
 		if self.rules.blackjack(dealer.hands[0]):
+			print "Dealer blackjack everyone loses"
 			self.everybody_loses()
 			return
 		self.for_all_hands(self.check_blackjacks)
-
+		self.for_all_hands(self.hand_actions)
+		self.play_dealer()
+		if self.rules.bust(self.dealer.hands[0]):
+			self.everybody_wins()
+			return
+		self.for_all_hands(self.eval_hand)
+	def eval_hand(self,player,hand):
+		if hand.value() > dealer.hands[0].value():
+			player.win_hand(hand)
+		elif hand.value() < dealer.hands[0].value():
+			player.lose_hand(hand)
+		else: 
+			player.push_hand(hand)
+	def play_dealer(self):
+		hand = self.dealer.hands[0]
+		while not self.rules.bust(hand):
+			if hand.value() < 17:
+				print self.dealer.name + " hits"
+				self.deal_card(self.dealer,hand)
+			else: return
+			
+	def hand_actions(self,player,hand):
+		while not self.rules.bust(hand):
+			action = player.action(hand,dealer.show_upcard())
+			if action == HIT:
+				print player.name + " hits"
+				self.deal_card(player,hand)
+			elif action == STAY:
+				return
+		player.lose_hand(hand)
 	def for_all_hands(self,func,*args,**kwargs):
 		for p in players:
 			for h in p.hands:
@@ -100,7 +152,9 @@ class Blackjack:
 	def everybody_loses(self):
 		for p in players:
 			p.lose_all_hands()
-
+	def everybody_wins(self):
+		for p in players:
+			p.win_all_hands()
 		
 	def take_bets(self):
 		for p in self.players:
@@ -113,11 +167,11 @@ class Blackjack:
 			card = self.deck.pop()
 		return card
 	def deal_card(self,player,hand):
-		hand.deal_card(self.draw_card())
+		player.deal_card(hand,self.draw_card())
 	def deal_cards(self):
 		for i in range(0,2):
 			self.for_all_hands(self.deal_card)
-			dealer.hands[0].deal_card(self.draw_card())
+			self.deal_card(dealer,dealer.hands[0])
 	def get_new_deck(self):
 		return (range(2,10) * 4 + [10] * (4 * 4) + [11] * 4) * self.decks
 	def shuffle(self):
@@ -128,12 +182,8 @@ class Blackjack:
 class Dealer(Player):
 	def __init__(self):
 		Player.__init__(self,"Dealer",10000000000000000000)	
-	
-	def play_hands(self,players):
-		for p in players:
-			self.play_hand(p)
 	def show_upcard(self):
-		return self.hand[0]
+		return self.hands[0].cards[0]
 
 	
 	
