@@ -100,6 +100,9 @@ class Player:
 		hand.place_bet(10)
 		self.print_action("bets " + str(10))
 		self.hands.append(hand)
+	def double_bet(self,hand):
+		self.bankroll -= hand.bet
+		hand.bet *= 2
 
 	def action(self,hand,upcard):
 		return self.strategy.action(hand,upcard)
@@ -200,7 +203,7 @@ class Blackjack:
 			elif action == STAY:
 				return
 			elif action == DOUBLE:
-				hand.bet *= 2
+				player.double_bet(hand)
 				self.deal_card(player,hand)
 				return
 		player.lose_hand(hand)
@@ -251,7 +254,7 @@ class Dealer(Player):
 
 	
 	
-players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,SimpleStrategy()) ] 
+players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,BasicStrategy()) ] 
 dealer = Dealer()
 decks = 6
 
@@ -259,7 +262,7 @@ dealer = Dealer()
 
 bj = Blackjack(dealer,players,Rules(),decks,10)
 
-for i in range(0,10):
+for i in range(0,10000):
 #	print
 	bj.play_hand()
 	bj.clear_all_cards()
