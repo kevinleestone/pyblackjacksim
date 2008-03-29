@@ -18,19 +18,23 @@ class Hand:
 	def __init__(self):
 		self.bet = 0
 		self.cards = []
+		self.sum = 0
 	def card_value(self,card):
-		if ( sum(self.cards) + card )  > 21 and card == 11:
+		if ( self.sum + card )  > 21 and card == 11:
 			return 1
 		else: return card 
 	def value(self):
-		return sum(self.cards)
+		return self.sum
 	def deal_card(self,card):
+		new_card = self.card_value(card)
 		self.cards.append(self.card_value(card))
+		self.sum += new_card
 	def place_bet(self,bet):
 		self.bet = bet
 	def clear_cards(self):
 		self.bet = 0
 		self.cards = [] 
+		self.sum = 0
 class Player:
 	def __init__(self,name,bankroll):
 		self.name = name
@@ -46,8 +50,8 @@ class Player:
 		if self.print_actions:
 			print self.name + " " + action
 	def clear_cards(self):
-		self.hand = []
-		self.bet = 0
+		for hand in self.hands:
+			hand.clear_cards()
 	def bet_hands(self):
 		for h in self.hands:
 			self.bet_hand(h)
@@ -97,9 +101,9 @@ class Rules:
 		pass
 			
 	def blackjack(self,hand):
-		return sum(hand.cards) == 21
+		return hand.value() == 21
 	def bust(self,hand):
-		return sum(hand.cards) > 21
+		return hand.value() > 21
 
 class Blackjack:
 	def __init__(self,dealer,players,rules,decks,minbet):
@@ -109,11 +113,12 @@ class Blackjack:
 		self.minbet = minbet
 		self.players = players
 		self.dealer = dealer
+		self.shuffles = 0
 	def play_hand(self):
 		self.take_bets()
 		self.deal_cards()
 		if self.rules.blackjack(dealer.hands[0]):
-			print "Dealer blackjack everyone loses"
+			dealer.print_action("blackjack everyone loses")
 			self.everybody_loses()
 			return
 		self.for_all_hands(self.check_blackjacks)
@@ -123,6 +128,11 @@ class Blackjack:
 			self.everybody_wins()
 			return
 		self.for_all_hands(self.eval_hand)
+	def clear_all_cards(self):
+		for p in self.players:
+			p.clear_cards()
+		dealer.clear_cards()
+		
 	def eval_hand(self,player,hand):
 		if hand.value() > dealer.hands[0].value():
 			player.win_hand(hand)
@@ -170,6 +180,8 @@ class Blackjack:
 			card = self.deck.pop()
 		except IndexError: 
 			self.shuffle()
+			self.shuffles += 1
+			#print "Shuffling for the " + str(self.shuffles) + " time"
 			card = self.deck.pop()
 		return card
 	def deal_card(self,player,hand):
@@ -181,7 +193,6 @@ class Blackjack:
 	def get_new_deck(self):
 		return (range(2,10) * 4 + [10] * (4 * 4) + [11] * 4) * self.decks
 	def shuffle(self):
-		#print "Shuffling Deck"
 		self.deck = self.get_new_deck()	
 		random.shuffle(self.deck)
 		
@@ -201,8 +212,9 @@ dealer = Dealer()
 
 bj = Blackjack(dealer,players,Rules(),decks,10)
 
-for i in range(0,1000):
+for i in range(0,100000):
 	bj.play_hand()
+	bj.clear_all_cards()
 
 for p in players:
 	print "=============== " + p.name + " ==============="
