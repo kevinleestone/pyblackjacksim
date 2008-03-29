@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import random
+from optparse import OptionParser
 
 
 DOUBLE = 1
@@ -252,27 +253,31 @@ class Dealer(Player):
 	def show_upcard(self):
 		return self.hands[0].cards[0]
 
-	
-	
-players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,BasicStrategy()) ] 
-dealer = Dealer()
-decks = 6
+if __name__ == "__main__":	
+	option_parser = OptionParser()
+	option_parser.add_option("-n", "--hands", dest="hands", help='Number of hands to play', type="int", default=1)
+	(options, args) = option_parser.parse_args()
 
-dealer = Dealer()
+		
+	players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,BasicStrategy()) ] 
+	dealer = Dealer()
+	decks = 6
 
-bj = Blackjack(dealer,players,Rules(),decks,10)
+	dealer = Dealer()
 
-for i in range(0,10000):
-#	print
-	bj.play_hand()
-	bj.clear_all_cards()
+	bj = Blackjack(dealer,players,Rules(),decks,10)
 
-for p in players:
-	print "=============== " + p.name + " ==============="
-	print "Strategy: " + p.strategy.__class__.__name__
-	print "Blackjacks: " + str(p.blackjacks)
-	print "Wins: " + str(p.wins)
-	print "Losses: " + str(p.losses)
-	print "Pushes: " + str(p.pushes)
-	print "Bankroll: " + str(p.bankroll)
+	for i in range(0,options.hands):
+	#	print
+		bj.play_hand()
+		bj.clear_all_cards()
+
+	for p in players:
+		print "=============== " + p.name + " ==============="
+		print "Strategy: " + p.strategy.__class__.__name__
+		print "Blackjacks: " + str(p.blackjacks)
+		print "Wins: " + str(p.wins)
+		print "Losses: " + str(p.losses)
+		print "Pushes: " + str(p.pushes)
+		print "Bankroll: " + str(p.bankroll)
 
