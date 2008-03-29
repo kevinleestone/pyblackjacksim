@@ -10,9 +10,48 @@ STAY   = 4
 class Strategy:
 	def __init__(self):
 		pass
+	
+	def always(self,always_range,action):
+		tmp_dict = {}
+		for i in always_range:
+			tmp_dict[i] = action
+		return tmp_dict
+
+class SimpleStrategy(Strategy):
+	def __init__(self):
+		Strategy.__init__(self)
+	def action(self,hand,upcard):
+		if hand.value() < 17:
+			return HIT
+		else: return STAY
 class BasicStrategy(Strategy):
 	def __init__(self):
 		Strategy.__init__(self)
+		self.strategy_table = {}
+		for i in range(17,22):
+			self.strategy_table[i] = self.always(range(2,12),STAY)
+		for i in range(13,17):
+			self.strategy_table[i] = self.always(range(2,7),STAY) 
+			self.strategy_table[i].update(self.always(range(7,12),HIT))
+		self.strategy_table[12] = { 2: HIT , 3: HIT } 
+		self.strategy_table[12].update(self.always(range(4,7),STAY)) 
+		self.strategy_table[12].update(self.always(range(7,12),HIT))
+		for i in range(2,12):
+			self.strategy_table[i] = self.always(range(2,12),HIT)
+			
+	def action(self,hand,upcard):
+		try:
+			return self.strategy_table[hand.value()][upcard]
+		except KeyError:
+			print "upcard: " + str(upcard)
+			print "hand value: " + str(hand.value())
+			raise
+
+class BetterBasicStrategy(BasicStrategy):
+	def __init__(self):
+		BasicStrategy.__init__(self)
+		self.strategy_table[11] = self.always(range(2,12), DOUBLE)
+
 
 class Hand:
 	def __init__(self):
@@ -36,34 +75,36 @@ class Hand:
 		self.cards = [] 
 		self.sum = 0
 class Player:
-	def __init__(self,name,bankroll):
+	def __init__(self,name,bankroll,playhands,strategy):
 		self.name = name
 		self.bankroll = bankroll
-		self.strategy = BasicStrategy()
-		self.hands = [Hand()]
+		self.strategy = strategy
+		self.hands = []
 		self.blackjacks = 0
 		self.wins = 0
 		self.losses = 0
 		self.pushes = 0
 		self.print_actions = False
+		self.num_hands = playhands
 	def print_action(self,action):
 		if self.print_actions:
 			print self.name + " " + action
 	def clear_cards(self):
 		for hand in self.hands:
-			hand.clear_cards()
+			self.destroy_hand(hand)
 	def bet_hands(self):
-		for h in self.hands:
-			self.bet_hand(h)
+		for i in range(0,self.num_hands):
+			self.bet_hand(Hand())
 	def bet_hand(self,hand):
 		self.bankroll -= 10
 		hand.place_bet(10)
 		self.print_action("bets " + str(10))
+		self.hands.append(hand)
 
 	def action(self,hand,upcard):
-		if hand.value() < 17:
-			return HIT
-		else: return STAY
+		return self.strategy.action(hand,upcard)
+	def destroy_hand(self,hand):
+		del self.hands[self.hands.index(hand)]
 	def lose_all_hands(self):
 		for h in self.hands:
 			self.lose_hand(h)
@@ -75,25 +116,26 @@ class Player:
 			return
 		self.print_action("loses hand")
 		self.losses += 1
-		hand.clear_cards()
+		self.destroy_hand(hand)
 	def win_hand(self,hand):
 		if not hand.value():
 			return
 		self.print_action("wins hand")
 		self.wins += 1
 		self.bankroll += hand.bet * 2
-		hand.clear_cards()
+		self.destroy_hand(hand)
 	def push_hand(self,hand):
 		self.print_action("pushes")
 		self.pushes += 1
 		self.bankroll += hand.bet
+		self.destroy_hand(hand)
 	def blackjack_hand(self,hand):
 		self.print_action("Blackjack!!")
 		self.blackjacks += 1
 		self.bankroll += hand.bet + hand.bet * (3./2.)
-		hand.clear_cards()
+		self.destroy_hand(hand)
 	def deal_card(self,hand,card):
-		self.print_action("dealt" + str(card))
+		self.print_action("dealt " + str(card))
 		hand.deal_card(card)
 
 class Rules:
@@ -115,6 +157,7 @@ class Blackjack:
 		self.dealer = dealer
 		self.shuffles = 0
 	def play_hand(self):
+		self.dealer.hands.append(Hand())
 		self.take_bets()
 		self.deal_cards()
 		if self.rules.blackjack(dealer.hands[0]):
@@ -155,6 +198,10 @@ class Blackjack:
 				player.print_action("hits")
 				self.deal_card(player,hand)
 			elif action == STAY:
+				return
+			elif action == DOUBLE:
+				hand.bet *= 2
+				self.deal_card(player,hand)
 				return
 		player.lose_hand(hand)
 	def for_all_hands(self,func,*args,**kwargs):
@@ -198,13 +245,13 @@ class Blackjack:
 		
 class Dealer(Player):
 	def __init__(self):
-		Player.__init__(self,"Dealer",10000000000000000000)	
+		Player.__init__(self,"Dealer",10000000000000000000,1,Strategy())	
 	def show_upcard(self):
 		return self.hands[0].cards[0]
 
 	
 	
-players = [ Player("jballs",1000), Player("woo",1000) ] 
+players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,SimpleStrategy()) ] 
 dealer = Dealer()
 decks = 6
 
@@ -212,12 +259,14 @@ dealer = Dealer()
 
 bj = Blackjack(dealer,players,Rules(),decks,10)
 
-for i in range(0,100000):
+for i in range(0,10):
+#	print
 	bj.play_hand()
 	bj.clear_all_cards()
 
 for p in players:
 	print "=============== " + p.name + " ==============="
+	print "Strategy: " + p.strategy.__class__.__name__
 	print "Blackjacks: " + str(p.blackjacks)
 	print "Wins: " + str(p.wins)
 	print "Losses: " + str(p.losses)
