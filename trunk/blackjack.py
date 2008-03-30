@@ -93,13 +93,13 @@ class Player:
 	def clear_cards(self):
 		for hand in self.hands:
 			self.destroy_hand(hand)
-	def bet_hands(self):
+	def bet_hands(self,minbet):
 		for i in range(0,self.num_hands):
-			self.bet_hand(Hand())
-	def bet_hand(self,hand):
-		self.bankroll -= 10
-		hand.place_bet(10)
-		self.print_action("bets " + str(10))
+			self.bet_hand(Hand(),minbet)
+	def bet_hand(self,hand,minbet):
+		self.bankroll -= minbet
+		hand.place_bet(minbet)
+		self.print_action("bets " + str(minbet))
 		self.hands.append(hand)
 	def double_bet(self,hand):
 		self.bankroll -= hand.bet
@@ -108,7 +108,7 @@ class Player:
 	def action(self,hand,upcard):
 		return self.strategy.action(hand,upcard)
 	def destroy_hand(self,hand):
-		del self.hands[self.hands.index(hand)]
+		self.hands.remove(hand)
 	def lose_all_hands(self):
 		for h in self.hands:
 			self.lose_hand(h)
@@ -225,7 +225,7 @@ class Blackjack:
 		
 	def take_bets(self):
 		for p in self.players:
-			p.bet_hands()
+			p.bet_hands(self.minbet)
 	def draw_card(self):
 		try:
 			card = self.deck.pop()
@@ -259,13 +259,13 @@ if __name__ == "__main__":
 	(options, args) = option_parser.parse_args()
 
 		
-	players = [ Player("jballs",1000,1,BetterBasicStrategy()), Player("woo",1000,1,BasicStrategy()) ] 
+	players = [ Player("Player 1",0,1,BetterBasicStrategy()), Player("Player 2",0,1,BasicStrategy()) ] 
 	dealer = Dealer()
 	decks = 6
 
 	dealer = Dealer()
 
-	bj = Blackjack(dealer,players,Rules(),decks,10)
+	bj = Blackjack(dealer,players,Rules(),decks,1000)
 
 	for i in range(0,options.hands):
 	#	print
@@ -275,9 +275,9 @@ if __name__ == "__main__":
 	for p in players:
 		print "=============== " + p.name + " ==============="
 		print "Strategy: " + p.strategy.__class__.__name__
-		print "Blackjacks: " + str(p.blackjacks)
-		print "Wins: " + str(p.wins)
-		print "Losses: " + str(p.losses)
-		print "Pushes: " + str(p.pushes)
+		print "Blackjacks: " + str(p.blackjacks) + " ( " + str(float(p.blackjacks) / options.hands) + "% )"
+		print "Wins: " + str(p.wins) + " ( " + str(float(p.wins) / options.hands) + "% )"
+		print "Losses: " + str(p.losses) + " ( " + str(float(p.losses) / options.hands) + "% )"
+		print "Pushes: " + str(p.pushes) + " ( " + str(float(p.pushes) / options.hands) + "% )"
 		print "Bankroll: " + str(p.bankroll)
 
