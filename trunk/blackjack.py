@@ -149,7 +149,8 @@ class Player:
 		self.give_money(hand,1)
 	def generate_outcome(self,outcome,hand):
 		self.outcomes['outcomes'][outcome] += 1
-		self.outcomes['counts'][(outcome,self.card_count)] += 1
+		self.outcomes['counts'][(self.card_count,outcome)] += 1
+		self.outcomes['starting_hands'][(tuple(sorted(hand.cards[:2])),outcome)] += 1
 			
 	@handfinisher
 	def push_hand(self,hand):
@@ -167,13 +168,73 @@ class Player:
 		hand.deal_card(card)
 	def print_stats(self):
 		print "=============== " + self.name + " ==============="
-		print self.outcomes
 		print "Strategy: " + self.strategy.__class__.__name__
 		print "Blackjacks: " + str(self.outcomes['outcomes']['blackjack']) + " ( " + str(float(self.outcomes['outcomes']['blackjack']) / self.hands_played) + "% )"
 		print "Wins: " + str(self.outcomes['outcomes']['win']) + " ( " + str(float(self.outcomes['outcomes']['win']) / self.hands_played) + "% )"
 		print "Losses: " + str(self.outcomes['outcomes']['lose']) + " ( " + str(float(self.outcomes['outcomes']['lose']) / self.hands_played) + "% )"
 		print "Pushes: " + str(self.outcomes['outcomes']['push']) + " ( " + str(float(self.outcomes['outcomes']['push']) / self.hands_played) + "% )"
-		print "Bankroll: " + str(self.bankroll)
+		print "Bankroll: $" + str(self.bankroll)
+		print "Deck Count Stats"
+		self.print_count_stats()
+		print "Starting Hand Stats"
+		self.print_card_stats()
+	def print_count_stats(self):
+		columns = ('count', 'blackjack', 'win', 'push' , 'lose')
+		counts_done = []
+		keys = self.outcomes['counts'].keys()
+		keys.sort()
+		print "\t".join(columns) + "\twin %"
+		for count in keys:
+			total_hands = 0
+			if count[0] in counts_done:
+				continue
+			print str(count[0]) + "\t",
+			for column in columns[1:]:
+				try:
+					print self.outcomes['counts'][(count[0],column)],
+					total_hands += self.outcomes['counts'][(count[0],column)]
+				except KeyError:
+					print 0
+				print "\t",
+			total_wins = 0.0
+			try:
+				total_wins += self.outcomes['counts'][(count[0],'blackjack')]
+			except KeyError: pass
+			try:
+				total_wins += self.outcomes['counts'][(count[0],'win')]
+			except KeyError: pass
+			print "%.2f%%" % (total_wins/total_hands * 100, ) ,
+			print
+			counts_done.append(count[0])
+	def print_card_stats(self):
+		columns = ('count', 'blackjack', 'win', 'push' , 'lose')
+		counts_done = []
+		keys = self.outcomes['starting_hands'].keys()
+		keys.sort(lambda x,y: cmp(sum(x[0]),sum(y[0])))
+		print "\t".join(columns) + "\twin %"
+		for count in keys:
+			total_hands = 0
+			if count[0] in counts_done:
+				continue
+			print str(count[0]) + "\t",
+			for column in columns[1:]:
+				try:
+					print self.outcomes['starting_hands'][(count[0],column)],
+					total_hands += self.outcomes['starting_hands'][(count[0],column)]
+				except KeyError:
+					print 0
+				print "\t",
+			total_wins = 0.0
+			try:
+				total_wins += self.outcomes['starting_hands'][(count[0],'blackjack')]
+			except KeyError: pass
+			try:
+				total_wins += self.outcomes['starting_hands'][(count[0],'win')]
+			except KeyError: pass
+			print "%.2f%%" % (total_wins/total_hands * 100, ) ,
+			print
+			counts_done.append(count[0])
+
 
 class Rules:
 	def __init__(self):
