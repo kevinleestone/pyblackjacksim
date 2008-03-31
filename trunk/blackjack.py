@@ -76,6 +76,10 @@ class Hand:
 		return self.sum
 	def deal_card(self,card):
 		new_card = self.card_value(card)
+		if ( new_card + self.sum ) > 21 and 11 in self.cards:
+			self.cards.remove(11)
+			self.cards.append(1)	
+			self.sum -= 10
 		self.cards.append(self.card_value(card))
 		self.sum += new_card
 	def place_bet(self,bet):
