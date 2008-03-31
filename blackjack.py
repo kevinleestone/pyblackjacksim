@@ -197,29 +197,33 @@ class Player:
 		print "Starting Hand Stats"
 		self.print_card_stats()
 	def print_count_stats(self):
-		columns = ('count', 'blackjack', 'win', 'push' , 'lose', 'win %')
+		columns = ('count', 'blackjack (%)', 'win (%)', 'push (%)' , 'lose (%)', 'total (%)')
 		keys = self.outcomes['counts'].keys()
 		keys.sort()
-		print ("%10s" * len(columns)) % columns
+		print ("%20s" * len(columns)) % columns
 		for count in keys:
 			total_hands = 0
 			outcome_counter = self.outcomes['counts'][count]
-			print "%10d" % count,
-			print "%10d" * 4  % (outcome_counter.blackjack, outcome_counter.win, outcome_counter.push,
-							outcome_counter.lose),
-			print "%10.2f%%" % (outcome_counter.win / outcome_counter.total() * 100, ) 
+			print "%20d" % count,
+			print "%10d (%6.2f%%)" * 5  % (outcome_counter.blackjack, outcome_counter.percentage('blackjack'),
+						       outcome_counter.win, outcome_counter.percentage('win'), 
+						       outcome_counter.push, outcome_counter.percentage('push'), 
+						       outcome_counter.lose, outcome_counter.percentage('lose'),
+						       outcome_counter.total(), outcome_counter.total() / self.hands_played  * 100 )
 	def print_card_stats(self):
-		columns = ('count', 'blackjack', 'win', 'push' , 'lose', 'win %')
+		columns = ('count', 'blackjack (%)', 'win (%)', 'push (%)' , 'lose (%)', 'total (%)')
 		keys = self.outcomes['starting_hands'].keys()
 		keys.sort(lambda x,y: cmp(sum(x),sum(y)))
-		print ("%10s " * len(columns)) % columns
+		print ("%20s" * len(columns)) % columns
 		for count in keys:
 			total_hands = 0
 			outcome_counter = self.outcomes['starting_hands'][count]
-			print "%10s" % str(count),
-			print "%10d " * 4 % (outcome_counter.blackjack, outcome_counter.win, outcome_counter.push,
-							outcome_counter.lose),
-			print "%10.2f%%" % (outcome_counter.win / outcome_counter.total() * 100, ) 
+			print "%20s" % str(count),
+			print "%10d (%6.2f%%)" * 5  % (outcome_counter.blackjack, outcome_counter.percentage('blackjack'),
+						       outcome_counter.win, outcome_counter.percentage('win'), 
+						       outcome_counter.push, outcome_counter.percentage('push'), 
+						       outcome_counter.lose, outcome_counter.percentage('lose'),
+						       outcome_counter.total(), outcome_counter.total() / self.hands_played  * 100 )
 
 
 class Rules:
