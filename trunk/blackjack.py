@@ -1,6 +1,8 @@
 #!/usr/bin/python
 import random
 from optparse import OptionParser
+import collections
+import lib
 
 
 DOUBLE = 1
@@ -55,10 +57,11 @@ class BetterBasicStrategy(BasicStrategy):
 
 
 class Hand:
-	def __init__(self):
+	def __init__(self,player):
 		self.bet = 0
 		self.cards = []
 		self.sum = 0
+		self.player = player
 	def card_value(self,card):
 		if ( self.sum + card )  > 21 and card == 11:
 			return 1
@@ -70,44 +73,56 @@ class Hand:
 		self.cards.append(self.card_value(card))
 		self.sum += new_card
 	def place_bet(self,bet):
-		self.bet = bet
+		self.bet += bet
+		self.player.take_money(bet)
+	def to_tuple(self):
+		return tuple(self.cards)
 	def clear_cards(self):
 		self.bet = 0
 		self.cards = [] 
 		self.sum = 0
+
+def handfinisher(fn):
+	def new(self,hand,*args):
+		fn(self,hand,*args)
+		self.destroy_hand(hand)	
+	return new
 class Player:
 	def __init__(self,name,bankroll,playhands,strategy):
 		self.name = name
 		self.bankroll = bankroll
 		self.strategy = strategy
 		self.hands = []
-		self.blackjacks = 0
-		self.wins = 0
-		self.losses = 0
-		self.pushes = 0
+		self.outcomes = collections.defaultdict(lib.counterdict)
 		self.print_actions = False
 		self.num_hands = playhands
+		self.card_count = 0
+		self.hands_played = 0
 	def print_action(self,action):
 		if self.print_actions:
 			print self.name + " " + action
+	def round_over(self): 
+		self.clear_cards()
 	def clear_cards(self):
 		for hand in self.hands:
 			self.destroy_hand(hand)
 	def bet_hands(self,minbet):
 		for i in range(0,self.num_hands):
-			self.bet_hand(Hand(),minbet)
+			self.bet_hand(Hand(self),minbet)
 	def bet_hand(self,hand,minbet):
-		self.bankroll -= minbet
 		hand.place_bet(minbet)
 		self.print_action("bets " + str(minbet))
 		self.hands.append(hand)
+	def take_money(self,amount):
+		self.bankroll -= amount	
 	def double_bet(self,hand):
-		self.bankroll -= hand.bet
-		hand.bet *= 2
-
+		hand.place_bet(hand.bet)
+	def notify_count(self,count):
+		self.card_count = count
 	def action(self,hand,upcard):
 		return self.strategy.action(hand,upcard)
 	def destroy_hand(self,hand):
+		self.hands_played += 1
 		self.hands.remove(hand)
 	def lose_all_hands(self):
 		for h in self.hands:
@@ -115,32 +130,50 @@ class Player:
 	def win_all_hands(self):
 		for h in self.hands:
 			self.win_hand(h)
+	def give_money(self,hand,bet_multiplier):
+		self.bankroll += hand.bet + ( hand.bet * bet_multiplier )
+		
+	@handfinisher
 	def lose_hand(self,hand):
 		if not hand.value():
 			return
 		self.print_action("loses hand")
-		self.losses += 1
-		self.destroy_hand(hand)
+		self.generate_outcome("lose",hand)
+
+	@handfinisher
 	def win_hand(self,hand):
 		if not hand.value():
 			return
 		self.print_action("wins hand")
-		self.wins += 1
-		self.bankroll += hand.bet * 2
-		self.destroy_hand(hand)
+		self.generate_outcome("win",hand)
+		self.give_money(hand,1)
+	def generate_outcome(self,outcome,hand):
+		self.outcomes['outcomes'][outcome] += 1
+		self.outcomes['counts'][(outcome,self.card_count)] += 1
+			
+	@handfinisher
 	def push_hand(self,hand):
 		self.print_action("pushes")
-		self.pushes += 1
+		self.generate_outcome("push",hand)
 		self.bankroll += hand.bet
-		self.destroy_hand(hand)
+
+	@handfinisher
 	def blackjack_hand(self,hand):
 		self.print_action("Blackjack!!")
-		self.blackjacks += 1
-		self.bankroll += hand.bet + hand.bet * (3./2.)
-		self.destroy_hand(hand)
+		self.generate_outcome("blackjack",hand)
+		self.give_money(hand,float(3/2))
 	def deal_card(self,hand,card):
 		self.print_action("dealt " + str(card))
 		hand.deal_card(card)
+	def print_stats(self):
+		print "=============== " + self.name + " ==============="
+		print self.outcomes
+		print "Strategy: " + self.strategy.__class__.__name__
+		print "Blackjacks: " + str(self.outcomes['outcomes']['blackjack']) + " ( " + str(float(self.outcomes['outcomes']['blackjack']) / self.hands_played) + "% )"
+		print "Wins: " + str(self.outcomes['outcomes']['win']) + " ( " + str(float(self.outcomes['outcomes']['win']) / self.hands_played) + "% )"
+		print "Losses: " + str(self.outcomes['outcomes']['lose']) + " ( " + str(float(self.outcomes['outcomes']['lose']) / self.hands_played) + "% )"
+		print "Pushes: " + str(self.outcomes['outcomes']['push']) + " ( " + str(float(self.outcomes['outcomes']['push']) / self.hands_played) + "% )"
+		print "Bankroll: " + str(self.bankroll)
 
 class Rules:
 	def __init__(self):
@@ -160,8 +193,9 @@ class Blackjack:
 		self.players = players
 		self.dealer = dealer
 		self.shuffles = 0
+		self.count = 0
 	def play_hand(self):
-		self.dealer.hands.append(Hand())
+		self.dealer.hands.append(Hand(dealer))
 		self.take_bets()
 		self.deal_cards()
 		if self.rules.blackjack(dealer.hands[0]):
@@ -208,6 +242,9 @@ class Blackjack:
 				self.deal_card(player,hand)
 				return
 		player.lose_hand(hand)
+	def notify_counts(self):
+		for p in players:
+			p.notify_count(self.count)
 	def for_all_hands(self,func,*args,**kwargs):
 		for p in players:
 			for h in p.hands:
@@ -234,6 +271,8 @@ class Blackjack:
 			self.shuffles += 1
 			#print "Shuffling for the " + str(self.shuffles) + " time"
 			card = self.deck.pop()
+		if card <= 6: self.count += 1
+		elif card >= 10: self.count -= 1
 		return card
 	def deal_card(self,player,hand):
 		player.deal_card(hand,self.draw_card())
@@ -246,6 +285,7 @@ class Blackjack:
 	def shuffle(self):
 		self.deck = self.get_new_deck()	
 		random.shuffle(self.deck)
+		self.count = 0
 		
 class Dealer(Player):
 	def __init__(self):
@@ -271,13 +311,7 @@ if __name__ == "__main__":
 	#	print
 		bj.play_hand()
 		bj.clear_all_cards()
+		bj.notify_counts()
 
 	for p in players:
-		print "=============== " + p.name + " ==============="
-		print "Strategy: " + p.strategy.__class__.__name__
-		print "Blackjacks: " + str(p.blackjacks) + " ( " + str(float(p.blackjacks) / options.hands) + "% )"
-		print "Wins: " + str(p.wins) + " ( " + str(float(p.wins) / options.hands) + "% )"
-		print "Losses: " + str(p.losses) + " ( " + str(float(p.losses) / options.hands) + "% )"
-		print "Pushes: " + str(p.pushes) + " ( " + str(float(p.pushes) / options.hands) + "% )"
-		print "Bankroll: " + str(p.bankroll)
-
+		p.print_stats()
