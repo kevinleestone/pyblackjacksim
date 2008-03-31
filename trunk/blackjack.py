@@ -146,8 +146,8 @@ class Player:
 
 	def generate_outcome(self,outcome,hand):
 		self.outcomes['outcomes'][outcome] += 1
-		self.outcomes['counts'][(self.card_count,outcome)] += 1
-		self.outcomes['starting_hands'][(tuple(sorted(hand.cards[:2])),outcome)] += 1
+		oc = self.outcomes['counts'].setdefault(self.card_count,lib.OutcomeCounter()).inc(outcome)
+		oc = self.outcomes['starting_hands'].setdefault(tuple(sorted(hand.cards[:2])),lib.OutcomeCounter()).inc(outcome)
 		
 	@handfinisher
 	def lose_hand(self,hand):
@@ -193,53 +193,29 @@ class Player:
 		print "Starting Hand Stats"
 		self.print_card_stats()
 	def print_count_stats(self):
-		columns = ('count', 'blackjack', 'win', 'push' , 'lose')
-		counts_done = []
+		columns = ('count', 'blackjack', 'win', 'push' , 'lose', 'win %')
 		keys = self.outcomes['counts'].keys()
 		keys.sort()
-		print "%10s %10s %10s %10s %10s" % columns,
-		print "%10s" % "win %"
+		print ("%10s" * len(columns)) % columns
 		for count in keys:
 			total_hands = 0
-			if count[0] in counts_done:
-				continue
-			print "%10d" % count[0],
-			for column in columns[1:]:
-				try:
-					print "%10d" % self.outcomes['counts'][(count[0],column)],
-					total_hands += self.outcomes['counts'][(count[0],column)]
-				except KeyError:
-					print "%10d" % 0
-			total_wins = 0.0
-			try:
-				total_wins += self.outcomes['counts'][(count[0],'win')]
-			except KeyError: pass
-			print "%10.2f%%" % (total_wins/total_hands * 100, ) 
-			counts_done.append(count[0])
+			outcome_counter = self.outcomes['counts'][count]
+			print "%10d" % count,
+			print "%10d" * 4  % (outcome_counter.blackjack, outcome_counter.win, outcome_counter.push,
+							outcome_counter.lose),
+			print "%10.2f%%" % (outcome_counter.win / outcome_counter.total() * 100, ) 
 	def print_card_stats(self):
-		columns = ('count', 'blackjack', 'win', 'push' , 'lose')
-		counts_done = []
+		columns = ('count', 'blackjack', 'win', 'push' , 'lose', 'win %')
 		keys = self.outcomes['starting_hands'].keys()
-		keys.sort(lambda x,y: cmp(sum(x[0]),sum(y[0])))
-		print "%10s %10s %10s %10s %10s" % columns,
-		print "%10s" % "win %"
+		keys.sort(lambda x,y: cmp(sum(x),sum(y)))
+		print ("%10s " * len(columns)) % columns
 		for count in keys:
 			total_hands = 0
-			if count[0] in counts_done:
-				continue
-			print "%10s" % str(count[0]),
-			for column in columns[1:]:
-				try:
-					print "%10d" % self.outcomes['starting_hands'][(count[0],column)],
-					total_hands += self.outcomes['starting_hands'][(count[0],column)]
-				except KeyError:
-					print "%10d" % 0
-			total_wins = 0.0
-			try:
-				total_wins += self.outcomes['starting_hands'][(count[0],'win')]
-			except KeyError: pass
-			print "%10.2f%%" % (total_wins/total_hands * 100, ) 
-			counts_done.append(count[0])
+			outcome_counter = self.outcomes['starting_hands'][count]
+			print "%10s" % str(count),
+			print "%10d " * 4 % (outcome_counter.blackjack, outcome_counter.win, outcome_counter.push,
+							outcome_counter.lose),
+			print "%10.2f%%" % (outcome_counter.win / outcome_counter.total() * 100, ) 
 
 
 class Rules:
