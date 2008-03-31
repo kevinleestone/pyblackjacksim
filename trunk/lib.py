@@ -16,3 +16,5 @@ class OutcomeCounter():
 		setattr(self,outcome, getattr(self,outcome) + by)
 	def total(self):
 		return float(self.win + self.lose + self.push)
+	def percentage(self,outcome):
+		return getattr(self,outcome) / self.total() * 100
