@@ -31,6 +31,7 @@ class BasicStrategy(Strategy):
 	def __init__(self):
 		Strategy.__init__(self)
 		self.strategy_table = {}
+		self.special_strategy = {}
 		for i in range(17,22):
 			self.strategy_table[i] = self.always(range(2,12),STAY)
 		for i in range(13,17):
@@ -41,8 +42,12 @@ class BasicStrategy(Strategy):
 		self.strategy_table[12].update(self.always(range(7,12),HIT))
 		for i in range(2,12):
 			self.strategy_table[i] = self.always(range(2,12),HIT)
+		
 			
 	def action(self,hand,upcard):
+		try:	
+			return self.special_strategy[tuple(hand.cards)][upcard] 
+		except KeyError: pass
 		try:
 			return self.strategy_table[hand.value()][upcard]
 		except KeyError:
@@ -54,6 +59,7 @@ class BetterBasicStrategy(BasicStrategy):
 	def __init__(self):
 		BasicStrategy.__init__(self)
 		self.strategy_table[11] = self.always(range(2,12), DOUBLE)
+		self.special_strategy[(8,8)] = self.always(range(2,12),SPLIT)
 
 
 class Hand:
@@ -81,11 +87,14 @@ class Hand:
 		self.bet = 0
 		self.cards = [] 
 		self.sum = 0
+	def destroy(self):
+		self.player.destroy_hand(self)
 
 def handfinisher(fn):
 	def new(self,hand,*args):
 		fn(self,hand,*args)
 		self.destroy_hand(hand)	
+		self.hands_played += 1
 	return new
 class Player:
 	def __init__(self,name,bankroll,playhands,strategy):
@@ -122,7 +131,6 @@ class Player:
 	def action(self,hand,upcard):
 		return self.strategy.action(hand,upcard)
 	def destroy_hand(self,hand):
-		self.hands_played += 1
 		self.hands.remove(hand)
 	def lose_all_hands(self):
 		for h in self.hands:
@@ -130,8 +138,16 @@ class Player:
 	def win_all_hands(self):
 		for h in self.hands:
 			self.win_hand(h)
+	def split_hand(self,hand):
+		self.give_money(hand,0)
+		self.destroy_hand(hand)
 	def give_money(self,hand,bet_multiplier):
 		self.bankroll += hand.bet + ( hand.bet * bet_multiplier )
+
+	def generate_outcome(self,outcome,hand):
+		self.outcomes['outcomes'][outcome] += 1
+		self.outcomes['counts'][(self.card_count,outcome)] += 1
+		self.outcomes['starting_hands'][(tuple(sorted(hand.cards[:2])),outcome)] += 1
 		
 	@handfinisher
 	def lose_hand(self,hand):
@@ -147,21 +163,19 @@ class Player:
 		self.print_action("wins hand")
 		self.generate_outcome("win",hand)
 		self.give_money(hand,1)
-	def generate_outcome(self,outcome,hand):
-		self.outcomes['outcomes'][outcome] += 1
-		self.outcomes['counts'][(self.card_count,outcome)] += 1
-		self.outcomes['starting_hands'][(tuple(sorted(hand.cards[:2])),outcome)] += 1
+
 			
 	@handfinisher
 	def push_hand(self,hand):
 		self.print_action("pushes")
 		self.generate_outcome("push",hand)
-		self.bankroll += hand.bet
+		self.give_money(hand,0)
 
 	@handfinisher
 	def blackjack_hand(self,hand):
 		self.print_action("Blackjack!!")
 		self.generate_outcome("blackjack",hand)
+		self.generate_outcome("win",hand)
 		self.give_money(hand,float(3/2))
 	def deal_card(self,hand,card):
 		self.print_action("dealt " + str(card))
@@ -198,9 +212,6 @@ class Player:
 				print "\t",
 			total_wins = 0.0
 			try:
-				total_wins += self.outcomes['counts'][(count[0],'blackjack')]
-			except KeyError: pass
-			try:
 				total_wins += self.outcomes['counts'][(count[0],'win')]
 			except KeyError: pass
 			print "%.2f%%" % (total_wins/total_hands * 100, ) ,
@@ -225,9 +236,6 @@ class Player:
 					print 0
 				print "\t",
 			total_wins = 0.0
-			try:
-				total_wins += self.outcomes['starting_hands'][(count[0],'blackjack')]
-			except KeyError: pass
 			try:
 				total_wins += self.outcomes['starting_hands'][(count[0],'win')]
 			except KeyError: pass
@@ -302,6 +310,27 @@ class Blackjack:
 				player.double_bet(hand)
 				self.deal_card(player,hand)
 				return
+			elif action == SPLIT:
+				# Take one of the pair off the current hand
+				card = hand.cards.pop()
+
+				player.split_hand(hand)
+
+				# Create and play 2 new hands with starting card "card"
+				for i in range(0,2):
+				
+					#create a new hand and add that card to it
+					# FIXME: must not allow new_hand to change up the bet
+					new_hand = Hand(player)
+					player.bet_hand(new_hand,self.minbet)
+					player.deal_card(new_hand,card)	
+					
+					#deal another card to the new_hand giving it 2
+					player.deal_card(new_hand,self.draw_card())
+					
+					#play new hand
+					self.hand_actions(player,new_hand)
+				return 	
 		player.lose_hand(hand)
 	def notify_counts(self):
 		for p in players:
@@ -366,7 +395,7 @@ if __name__ == "__main__":
 
 	dealer = Dealer()
 
-	bj = Blackjack(dealer,players,Rules(),decks,1000)
+	bj = Blackjack(dealer,players,Rules(),decks,1)
 
 	for i in range(0,options.hands):
 	#	print
