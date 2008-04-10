@@ -20,7 +20,7 @@ public class BlackJackApplication implements EntryPoint {
    * This is the entry point method.
    */
   public void onModuleLoad() {
-	Hyperlink link = new Hyperlink("WOOT","woot");
+	Hyperlink link = new Hyperlink("Deal","deal");
 	
 
     final Game game = new Game();
@@ -29,14 +29,12 @@ public class BlackJackApplication implements EntryPoint {
 		public void onClick(Widget sender) {
 			// TODO Auto-generated method stub
 			game.playRound();
-			game.endRound();
 		}
 	
 	});
 	RootPanel.get().add(link);
 	
     game.playRound();
-    game.endRound();
   }
   
 }
